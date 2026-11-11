@@ -39,10 +39,17 @@ class RabbitEventPublisher:
             headers={"event_type": event_type},
         )
 
-    async def retry_or_dead_letter(self, body: dict[str, Any], attempt: int, exc: Exception) -> None:
+    async def retry_or_dead_letter(
+        self,
+        body: dict[str, Any],
+        attempt: int,
+        exc: Exception,
+        *,
+        retryable: bool = True
+    ) -> None:
         error = f"{type(exc).__name__}: {exc}"[:500]
-        if attempt >= settings.max_attempts:
-            log.error("Attempt %d/%d failed -> DLQ: %s", attempt, settings.max_attempts, error)
+        if not retryable or attempt >= settings.max_attempts:
+            log.error("Attempt %d/%d failed (retryable=%s) -> DLQ: %s", attempt, settings.max_attempts, retryable, error)
             await self._broker.publish(
                 body,
                 exchange=DLX_EXCHANGE,

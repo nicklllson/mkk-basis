@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from fastapi import FastAPI
 
@@ -23,6 +24,8 @@ async def lifespan(app: FastAPI):
         publisher,
         batch_size=settings.outbox_batch_size,
         poll_interval=settings.outbox_poll_interval_seconds,
+        retention=timedelta(hours=settings.outbox_retention_hours),
+        cleanup_interval=settings.outbox_cleanup_interval_seconds,
     )
     stop = asyncio.Event()
     task = asyncio.create_task(relay.run(stop))

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import OutboxEvent
@@ -26,6 +26,15 @@ class OutboxRepository:
             .with_for_update(skip_locked=True)
         )
         return result.all()
+
+    async def delete_published_before(self, cutoff: datetime) -> int:
+        result = await self._session.execute(
+            delete(OutboxEvent).where(
+                OutboxEvent.published_at.is_not(None),
+                OutboxEvent.published_at < cutoff,
+            )
+        )
+        return result.rowcount
 
     @staticmethod
     def mark_published(event: OutboxEvent) -> None:
