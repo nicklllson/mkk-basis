@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import time
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -17,11 +19,16 @@ class OutboxRelay:
         *,
         batch_size: int,
         poll_interval: float,
+        retention: timedelta,
+        cleanup_interval: float,
     ) -> None:
         self._session_factory = session_factory
         self._publisher = publisher
         self._batch_size = batch_size
         self._poll_interval = poll_interval
+        self._retention = retention
+        self._cleanup_interval = cleanup_interval
+        self._last_cleanup = 0.0
 
     async def publish_batch(self) -> int:
         async with self._session_factory.begin() as session:
@@ -49,6 +56,10 @@ class OutboxRelay:
                     connected = True
                     log.info("Outbox relay connected to broker")
                 published = await self.publish_batch()
+                now = time.monotonic()
+                if now - self._last_cleanup >= self._cleanup_interval:
+                    self._last_cleanup = now
+                    await self.cleanup()
             except Exception:
                 log.exception("Outbox relay iteration failed")
             if published == 0:
@@ -56,3 +67,10 @@ class OutboxRelay:
                     await asyncio.wait_for(stop.wait(), timeout=self._poll_interval)
                 except asyncio.TimeoutError:
                     pass
+
+    async def cleanup(self) -> None:
+        cutoff = datetime.now(timezone.utc) - self._retention
+        async with self._session_factory.begin() as session:
+            deleted = await OutboxRepository(session).delete_published_before(cutoff)
+        if deleted:
+            log.info("Outbox cleanup: deleted %d published events", deleted)

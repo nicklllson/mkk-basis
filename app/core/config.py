@@ -10,11 +10,13 @@ class Settings(BaseSettings):
 
     # Retry / DLQ
     max_attempts: int = 3
-    retry_base_delay_seconds: int = 5  # задержки: base * 2^(n-1) -> 5с, 10с, ...
+    retry_base_delay_seconds: int = 5
 
     # Outbox relay
     outbox_poll_interval_seconds: float = 1.0
     outbox_batch_size: int = 100
+    outbox_retention_hours: int = 24
+    outbox_cleanup_interval_seconds: float = 3600.0
 
     # Consumer
     consumer_concurrency: int = 10

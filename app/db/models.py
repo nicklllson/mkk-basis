@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, Enum, Index, Numeric, String, Uuid, text
+from sqlalchemy import DateTime, Enum, Index, Numeric, String, Uuid, text, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -58,3 +58,12 @@ class OutboxEvent(Base):
     __table_args__ = (
         Index("ix_outbox_unpublished", "created_at", postgresql_where=text("published_at IS NULL")),
     )
+
+class DeadLetter(Base):
+    __tablename__ = "dead_letters"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    payload: Mapped[Any] = mapped_column(JSONB)
+    attempts: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
